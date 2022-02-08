@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#define SPI_MASTER_DUMMY   0xFF
+
 // Commands for the ADC
 #define CMD_RESET 0x07
 #define CMD_START_SYNC 0x08
@@ -44,42 +44,50 @@
 #define REG_MASK_DRDY_MODE 0x02
 #define REG_MASK_RESERVED 0x01
 
+#define SPISet SPISettings(10000000, MSBFIRST, SPI_MODE1)
 class ADS1120 {
-  public:
-    ADS1120();
-    uint8_t ADS1120_CS_PIN;
-    uint8_t ADS1120_DRDY_PIN;
-    void writeRegister(uint8_t address, uint8_t value);
-    uint8_t readRegister(uint8_t address);
-    void begin(uint8_t cs_pin, uint8_t drdy_pin);
-    bool isDataReady(void);
-    uint16_t readADC(void);
-    byte * readADC_Array(void);
-    uint16_t readADC_Single(void);
-    double readADC_SingleTemp(void);
-    byte * readADC_SingleArray(void);
-    uint16_t convertToValue(byte * data);
-    double convertToTemp(byte * data);
-    void sendCommand(uint8_t command);
-    void reset(void);
-    void startSync(void);
-    void powerDown(void);
-    void rdata(void);
-    void writeRegisterMasked(uint8_t value, uint8_t mask, uint8_t address);
-    void setMultiplexer(uint8_t value);
-    void setGain(uint8_t gain);
-    void setPGAbypass(bool value);
-    void setDataRate(uint8_t value);
-    void setOpMode(uint8_t value);
-    void setConversionMode(uint8_t value);
-    void setTemperatureMode(uint8_t value);
-    void setBurnoutCurrentSources(bool value);
-    void setVoltageRef(uint8_t value);
-    void setFIR(uint8_t value);
-    void setPowerSwitch(uint8_t value);
-    void setIDACcurrent(uint8_t value);
-    void setIDAC1routing(uint8_t value);
-    void setIDAC2routing(uint8_t value);
-    void setDRDYmode(uint8_t value);
-  };
+public:
+	ADS1120(uint8_t ADS1120_CS_PIN, uint8_t ADS1120_DRDY_PIN);
+
+	void begin();
+
+	bool isDataReady(void);
+	uint16_t readADC(void);
+	uint16_t readADC_Single(void);
+	double readADC_SingleTemp(void);
+	byte *readADC_SingleArray(void);
+	uint16_t convertToValue(byte *data);
+
+	void reset(void);
+	void startSync(void);
+	void powerDown(void);
+	void rdata(void);
+
+	void setMultiplexer(uint8_t value);
+	void setGain(uint8_t gain);
+	void setPGAbypass(bool value);
+	void setDataRate(uint8_t value);
+	void setOpMode(uint8_t value);
+	void setConversionMode(uint8_t value);
+	void setTemperatureMode(uint8_t value);
+	void setBurnoutCurrentSources(bool value);
+	void setVoltageRef(uint8_t value);
+	void setFIR(uint8_t value);
+	void setPowerSwitch(uint8_t value);
+	void setIDACcurrent(uint8_t value);
+	void setIDAC1routing(uint8_t value);
+	void setIDAC2routing(uint8_t value);
+	void setDRDYmode(uint8_t value);
+
+private:
+	uint8_t cs;
+	uint8_t drdy;
+
+	void writeRegister(uint8_t address, uint8_t value);
+	uint8_t readRegister(uint8_t address);
+	void sendCommand(uint8_t command);
+	void writeRegisterMasked(uint8_t value, uint8_t mask, uint8_t address);
+	void readRegisterMasked(uint8_t value, uint8_t mask, uint8_t address);
+	double convertToTemp(byte *data);
+};
 #endif
