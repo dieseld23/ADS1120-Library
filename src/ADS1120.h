@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-
+#include <digitalWriteFast.h>
 
 // Commands for the ADC
 #define CMD_RESET 0x07
@@ -44,12 +44,15 @@
 #define REG_MASK_DRDY_MODE 0x02
 #define REG_MASK_RESERVED 0x01
 
-#define SPISet SPISettings(10000000, MSBFIRST, SPI_MODE1)
+// SPI clock: ADS1120 datasheet allows up to ~10 MHz but 4 MHz gives EMI/SI headroom
+// in a high-noise vehicle environment with 3 chips sharing the bus.
+#define SPISet SPISettings(4000000, MSBFIRST, SPI_MODE1)
 class ADS1120 {
 public:
-	ADS1120(uint8_t ADS1120_CS_PIN, uint8_t ADS1120_DRDY_PIN);
-
-	void begin();
+	ADS1120();
+ 	uint8_t ADS1120_CS_PIN;
+    uint8_t ADS1120_DRDY_PIN;
+	void begin(uint8_t ADS1120_CS_PIN, uint8_t ADS1120_DRDY_PIN);
 
 	bool isDataReady(void);
 	uint16_t readADC(void);
@@ -78,6 +81,9 @@ public:
 	void setIDAC1routing(uint8_t value);
 	void setIDAC2routing(uint8_t value);
 	void setDRDYmode(uint8_t value);
+
+	// DIAGNOSTIC: expose the private register read so we can dump config (e.g. check DRDYM).
+	uint8_t debugReadRegister(uint8_t address) { return readRegister(address); }
 
 private:
 	uint8_t cs;

@@ -1,15 +1,14 @@
-#include "ADS1120.h"
 #include <Arduino.h>
+#include "ADS1120.h"
 
-ADS1120::ADS1120(uint8_t ADS1120_CS_PIN, uint8_t ADS1120_DRDY_PIN) {
-  cs = ADS1120_CS_PIN;
-  drdy = ADS1120_DRDY_PIN;
 
+ADS1120::ADS1120() {
 }
 
-void ADS1120::begin() {
+void ADS1120::begin(uint8_t ADS1120_CS_PIN, uint8_t ADS1120_DRDY_PIN) {
 	// Set pins up
-
+	cs = ADS1120_CS_PIN;
+	drdy = ADS1120_DRDY_PIN;
 	// Configure the SPI interface (CPOL=0, CPHA=1)
 	SPI.begin();
 
@@ -17,59 +16,55 @@ void ADS1120::begin() {
 	pinMode(cs, OUTPUT);
 
 	// Configure DRDY as as input (mfg wants us to use interrupts)
-	//pinMode(drdy, INPUT);
-
+	pinMode(drdy, INPUT_PULLUP);
+	
 	SPI.beginTransaction(SPISet);
-	digitalWrite(cs, LOW); // Set CS Low
+	digitalWriteFast(cs, LOW); // Set CS Low
 	delayMicroseconds(1);			   // Wait a minimum of td(CSSC)
 	reset();						   // Send reset command
-	delayMicroseconds(200);
-	// Delay a minimum of 50 us + 32 * tclk
-
-	// Sanity check read back (optional)
-
+	delayMicroseconds(200);	// Delay a minimum of 50 us + 32 * tclk
 	startSync();						// Send start/sync for continuous conversion mode
 	delayMicroseconds(1);				// Delay a minimum of td(SCCS)
-	digitalWrite(cs, HIGH); // Clear CS to high
+	digitalWriteFast(cs, HIGH); // Clear CS to high
 	SPI.endTransaction();
 }
 
 void ADS1120::writeRegister(uint8_t address, uint8_t value) {
+	// CS setup/hold: datasheet min ~100 ns. 2 us is generous margin and avoids the original
+	// delay(5) calls that serialized the shared SPI bus for ~20 ms per setMultiplexer.
 	SPI.beginTransaction(SPISet);
-	digitalWrite(cs, LOW);
-	delay(5);
-	SPI.transfer(CMD_WREG | (address << 2)); // What not setting num bytes?
+	digitalWriteFast(cs, LOW);
+	delayMicroseconds(2);
+	SPI.transfer(CMD_WREG | (address << 2) | 0x00);
 	SPI.transfer(value);
-  SPI.transfer(0);
 	SPI.transfer(0);
-	delay(5);
-	//startSync(); // Send start/sync for continuous conversion mode
-	//delayMicroseconds(1); // Delay a minimum of td(SCCS)
-	digitalWrite(cs, HIGH);
+	SPI.transfer(0);
+	delayMicroseconds(2);
+	digitalWriteFast(cs, HIGH);
 	SPI.endTransaction();
 }
 
 uint8_t ADS1120::readRegister(uint8_t address) {
 	SPI.beginTransaction(SPISet);
-	digitalWrite(cs, LOW);
-	delay(5);
-	SPI.transfer(CMD_RREG | (address << 2)); // What not setting num bytes?
+	digitalWriteFast(cs, LOW);
+	delayMicroseconds(2);
+	SPI.transfer(CMD_RREG | (address << 2) | 0x00);
 	uint8_t data = SPI.transfer(0);
-	delay(5);
-	digitalWrite(cs, HIGH);
+	delayMicroseconds(2);
+	digitalWriteFast(cs, HIGH);
 	SPI.endTransaction();
 	return data;
 }
 
 bool ADS1120::isDataReady() {
-  delay(1);
-	digitalWrite(cs, LOW);
-	delayMicroseconds(1);
-	if (digitalRead(drdy) == LOW) {
+  //delay(1);
+//	digitalWriteFast(cs, LOW);
+//	delayMicroseconds(1);
+	if (digitalReadFast(drdy) == LOW) {
 		return true;
 	}
 
-	digitalWrite(cs, HIGH);
+//	digitalWriteFast(cs, HIGH);
 	return false;
 }
 
@@ -92,18 +87,18 @@ double ADS1120::readADC_SingleTemp() {
 byte *ADS1120::readADC_SingleArray() {
 
 	SPI.beginTransaction(SPISet);
-	digitalWrite(cs, LOW); // Take CS low
-	delayMicroseconds(1);			   // Minimum of td(CSSC)
+	digitalWriteFast(cs, LOW); // Take CS low
+	delayMicroseconds(10);			   // Minimum of td(CSSC)
 	static byte dataarray[2];
 	for (int x = 0; x < 2; x++) {
 		dataarray[x] = SPI.transfer(0);
 	}
 	SPI.transfer(0);
 	SPI.transfer(0);
-	delayMicroseconds(1); // Minimum of td(CSSC)
-	digitalWrite(cs, HIGH);
+	delayMicroseconds(10); // Minimum of td(CSSC)
+	digitalWriteFast(cs, HIGH);
 	SPI.endTransaction();
-	// Serial.print("0b");
+	//Serial.print("0b");
 	//Serial.println(dataarray[0],BIN);
 	//Serial.print("0b");
 	//Serial.println(dataarray[1],BIN);
@@ -112,12 +107,12 @@ byte *ADS1120::readADC_SingleArray() {
 }
 
 uint16_t ADS1120::convertToValue(byte *data) {
-	return (data[0]) << 8 | (data[1]); //Moving MSB and LSB to 16 bit
+	return (((uint16_t) data[0]) << 8 | (data[1])); //Moving MSB and LSB to 16 bit 
 }
 
 double ADS1120::convertToTemp(byte *data) {
 	// 14-bit result that is left-justified within the conversion result
-	uint16_t conversion = ((data[0]) << 8 | (data[1])) >> 2;
+	uint16_t conversion = ((uint16_t) (data[0]) << 8 | (data[1])) >> 2;
 	// Negative numbers are represented in binary twos complement format
 	if (conversion >= 8192) {
 		conversion = (~(conversion - 1)) ^ 0xC000;
@@ -128,17 +123,12 @@ double ADS1120::convertToTemp(byte *data) {
 }
 
 void ADS1120::sendCommand(uint8_t command) {
-	// Following Protocentral's code, not sure exactly what's going on here.
-	//digitalWrite(cs, LOW);
-	// delay(2);
-	// digitalWrite(cs, HIGH);
-	// delay(2);
 	SPI.beginTransaction(SPISet);
-	digitalWrite(cs, LOW);
-	delay(2);
+	digitalWriteFast(cs, LOW);
+	delayMicroseconds(2);
 	SPI.transfer(command);
-	delay(2);
-	digitalWrite(cs, HIGH);
+	delayMicroseconds(2);
+	digitalWriteFast(cs, HIGH);
 	SPI.endTransaction();
 }
 
